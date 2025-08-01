@@ -1,7 +1,6 @@
 #  AI Agent Karbon - Intelligent Bank Statement Parser Generator
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)]()
 
 > **An autonomous AI agent that automatically generates custom parsers for bank statement PDFs using Google's Gemini AI**
@@ -137,11 +136,8 @@ AI-Agent-Karbon/
 - Iteratively refines until success criteria are met
 - Maximum 3 attempts per bank
 
-## 🎬 Demo
-
-Watch our 3-minute demo video showing the agent in action:
-
-[📺 Watch Demo Video](#) *(Coming Soon)*
+##  Demo
+https://github.com/user-attachments/assets/d7bcacee-f303-443d-a9ed-6c3fef674945
 
 ##  Supported Banks
 
@@ -173,10 +169,6 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 5. Commit your changes: `git commit -m 'Add amazing feature'`
 6. Push to the branch: `git push origin feature/amazing-feature`
 7. Open a Pull Request
-
-##  License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ##  Acknowledgments
 
