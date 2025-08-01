@@ -11,12 +11,12 @@
 AI Agent Karbon is an intelligent system that revolutionizes the way we handle bank statement parsing. Instead of manually writing parsers for each bank's unique PDF format, this agent automatically analyzes sample data and generates custom parsers through an iterative plan → generate → test → refine loop.
 
 ###  Key Features
-
-- ** Autonomous Parser Generation**: Automatically creates custom parsers for any bank's PDF format
-- ** Intelligent Analysis**: Analyzes both PDF structure and expected CSV output
-- ** Iterative Refinement**: Continuously improves parsers through testing and feedback
-- ** Multi-Bank Support**: Designed to work with ICICI, HDFC, SBI, and other banks
-- ** Self-Learning**: Uses LLM feedback to enhance parsing accuracy
+ 
+-  Autonomous Parser Generation: Automatically creates custom parsers for any bank's PDF format
+-  Intelligent Analysis: Analyzes both PDF structure and expected CSV output
+-  Iterative Refinement: Continuously improves parsers through testing and feedback
+-  Multi-Bank Support: Designed to work with ICICI, HDFC, SBI, and other banks
+-  Self-Learning: Uses LLM feedback to enhance parsing accuracy
 
 ##  Technology Stack
 
@@ -184,19 +184,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Open Source Community** - For the amazing libraries that make this possible
 - **Bank Statement Data** - For providing real-world test cases
 
-##  Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/AI-Agent-Karbon/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/AI-Agent-Karbon/discussions)
-- **Email**: your-email@example.com
 
----
 
-<div align="center">
 
-**Made with ❤️ by [Your Name]**
 
-[![GitHub stars](https://img.shields.io/github/stars/yourusername/AI-Agent-Karbon?style=social)](https://github.com/yourusername/AI-Agent-Karbon)
-[![GitHub forks](https://img.shields.io/github/forks/yourusername/AI-Agent-Karbon?style=social)](https://github.com/yourusername/AI-Agent-Karbon)
-
-</div>
