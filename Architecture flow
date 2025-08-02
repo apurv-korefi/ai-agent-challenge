@@ -1,0 +1,3 @@
+START → Plan → Generate Code → Test Code → END
+                           ↖      ↓
+                            Fix Code
