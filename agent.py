@@ -1,0 +1,68 @@
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+from utils import save_parser_code
+from test_generator import generate_test_file
+import parser_strategies  
+
+def run_pytest(test_path: Path) -> bool:
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", str(test_path)],
+        capture_output=True, text=True
+    )
+    print(result.stdout)
+    if result.returncode != 0:
+        print(result.stderr)
+    return result.returncode == 0
+
+def strategy_to_code(func_name: str) -> str:
+    # Code for generated parser that imports the strategy as parse()
+    return f"import pandas as pd\nfrom parser_strategies import {func_name} as parse\n"
+
+def agent_loop(target, pdf_path, csv_path):
+    strategies = [
+        "parse_line_split",
+        "parse_regex",
+        "parse_table_extract"
+    ]
+
+    for attempt, name in enumerate(strategies, start=1):
+        print(f"\n[Attempt {attempt}] Trying strategy: {name}")
+        code = strategy_to_code(name)
+        save_parser_code(target, code)
+        generate_test_file(target, pdf_path, csv_path)
+
+        ok = run_pytest(Path("tests") / f"test_{target}.py")
+        if ok:
+            # Check if function used table extraction or text
+            func = getattr(parser_strategies, name)
+            with_table = check_if_table_used(func, pdf_path)
+            if with_table:
+                print(f"[SUCCESS] Strategy '{name}' worked using TABLE extraction ✅")
+            else:
+                print(f"[SUCCESS] Strategy '{name}' worked using TEXT parsing ✅")
+            return
+        else:
+            print(f"[FAIL] Strategy '{name}' failed. Trying next...")
+
+    print("[ERROR] All strategies failed ❌")
+
+def check_if_table_used(func, pdf_path: Path) -> bool:
+    """Small helper to detect if function extracted at least one row from a table."""
+    with pdf_path.open("rb") as f:
+        import pdfplumber
+        with pdfplumber.open(f) as pdf:
+            for page in pdf.pages:
+                if page.extract_table():
+                    return True
+    return False
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--target", required=True, help="Bank target name (e.g., icici)")
+    parser.add_argument("--pdf", required=True, help="Path to sample PDF")
+    parser.add_argument("--csv", required=True, help="Path to expected CSV")
+    args = parser.parse_args()
+
+    agent_loop(args.target, Path(args.pdf), Path(args.csv))
