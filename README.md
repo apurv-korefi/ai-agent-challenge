@@ -32,6 +32,17 @@ pip install -r requirements.txt
 data/<bank_name>/<bank_name>_sample.pdf
 data/<bank_name>/<bank_name>_sample.csv
 ```
+### Example for ICICI:
+```bash
+data/icici/icici_sample.pdf
+data/icici/icici_sample.csv
+
+```
 3. **Run the agent**
 ```bash
 python agent.py --target icici --pdf data/icici/icici_sample.pdf --csv data/icici/icici_sample.csv
+```
+4. **Verify results we can re-run tests manually**
+```bash 
+pytest tests/test_icici.py
+```
