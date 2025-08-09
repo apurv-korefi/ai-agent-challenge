@@ -52,3 +52,6 @@ The agent follows a plan → generate → test → self-fix loop.
 Given a target bank’s PDF and expected CSV, it generates a parser function (parse(pdf_path) -> pd.DataFrame) using one of several strategies, saves it in custom_parsers/, and creates a pytest test comparing its output to the CSV with DataFrame.equals.
 If the test fails, the agent switches to the next strategy and retries, up to 3 attempts.
 It stops as soon as the test passes, ensuring the parser works for the given bank format without manual coding.
+---
+## After run the code
+![Output](image.png)
