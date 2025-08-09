@@ -37,6 +37,12 @@ def agent_loop(target, pdf_path, csv_path):
         if ok:
             # Check if function used table extraction or text
             func = getattr(parser_strategies, name)
+            df = func(pdf_path)
+            # Save extracted CSV
+            output_csv = Path(f"output_{target}.csv")
+            df.to_csv(output_csv, index=False)
+            print(f"[SAVED] Extracted data saved to: {output_csv}")
+            
             with_table = check_if_table_used(func, pdf_path)
             if with_table:
                 print(f"[SUCCESS] Strategy '{name}' worked using TABLE extraction ✅")
