@@ -1,4 +1,4 @@
-# Karbon Agent-as-Coder Challenge
+# Karbon AI Assignment
 
 ## Overview
 
@@ -16,7 +16,7 @@ When run, the agent:
 
 1. **Install dependencies from requirements.txt**  
 ```
-pip install pandas pdfplumber pytest
+pip install -r requirements.txt
 ```
 
 2. **Prepare data**  
@@ -56,9 +56,9 @@ This design allows adding new banks by simply supplying a new sample PDF and CSV
 
 ```mermaid
 flowchart TD
-    Start([Start]) --> Plan[Plan: Extract CSV schema \n and create parser code]
-    Plan --> Generate[Generate Code: \n Write parser file in custom_parsers/]
-    Generate --> Test[Test: Run parser & \n compare output with CSV]
+    Start([Start]) --> Plan[Plan: Extract CSV schema and create parser code]
+    Plan --> Generate[Generate Code: Write parser file in custom_parsers]
+    Generate --> Test[Test: Run parser & compare output with CSV]
     Test --> CheckSuccess{Success?}
     CheckSuccess -- Yes --> End([End])
     CheckSuccess -- No --> CheckAttempts{Attempts < 3?}
