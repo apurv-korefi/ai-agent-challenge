@@ -14,3 +14,4 @@ def test_parse_equals_expected():
     parsed = parser.parse(r"data\icici\icici_sample.pdf")
     expected = pd.read_csv(r"data\icici\icici_sample.csv")
     assert normalize(parsed).equals(normalize(expected)), "Parsed output does not match expected"
+

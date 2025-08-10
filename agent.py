@@ -130,3 +130,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     agent_loop(args.target, Path(args.pdf), Path(args.csv))
+
