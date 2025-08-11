@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""
+Test Suite for PDF Parser Validation
+Tests generated parsers against expected CSV outputs.
+"""
+
+import sys
+import os
+import pandas as pd
+import importlib.util
+from pathlib import Path
+from typing import Optional
+
+
+def load_parser(parser_path: str):
+    """Dynamically load parser module"""
+    if not os.path.exists(parser_path):
+        raise FileNotFoundError(f"Parser file not found: {parser_path}")
+    
+    spec = importlib.util.spec_from_file_location("custom_parser", parser_path)
+    parser_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(parser_module)
+    
+    if not hasattr(parser_module, 'parse'):
+        raise AttributeError("Parser module must have a 'parse' function")
+    
+    return parser_module
+
+
+def load_expected_csv(csv_path: str) -> pd.DataFrame:
+    """Load expected results CSV"""
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"Expected CSV file not found: {csv_path}")
+    
+    return pd.read_csv(csv_path)
+
+
+def compare_dataframes(actual: pd.DataFrame, expected: pd.DataFrame) -> dict:
+    """Compare actual vs expected DataFrames"""
+    
+    results = {
+        "passed": False,
+        "errors": [],
+        "warnings": [],
+        "stats": {
+            "actual_rows": len(actual),
+            "expected_rows": len(expected),
+            "columns_match": False
+        }
+    }
+    
+    # Check if DataFrames are empty
+    if actual.empty and expected.empty:
+        results["passed"] = True
+        return results
+    
+    if actual.empty:
+        results["errors"].append("Actual DataFrame is empty")
+        return results
+    
+    if expected.empty:
+        results["errors"].append("Expected DataFrame is empty")
+        return results
+    
+    # Check required columns
+    required_columns = ['date', 'description', 'debit', 'credit', 'balance']
+    missing_columns = [col for col in required_columns if col not in actual.columns]
+    
+    if missing_columns:
+        results["errors"].append(f"Missing required columns: {missing_columns}")
+        return results
+    
+    # Check if expected has same columns
+    if set(expected.columns) != set(required_columns):
+        results["warnings"].append("Expected CSV doesn't have standard columns")
+    
+    results["stats"]["columns_match"] = True
+    
+    # Compare row counts
+    if len(actual) != len(expected):
+        results["warnings"].append(
+            f"Row count mismatch: actual={len(actual)}, expected={len(expected)}"
+        )
+    
+    # Sample comparison (first 5 rows)
+    try:
+        # Convert dates for comparison
+        if 'date' in actual.columns and 'date' in expected.columns:
+            actual['date'] = pd.to_datetime(actual['date'])
+            expected['date'] = pd.to_datetime(expected['date'])
+        
+        # Compare first few rows
+        sample_size = min(5, len(actual), len(expected))
+        
+        for i in range(sample_size):
+            actual_row = actual.iloc[i]
+            expected_row = expected.iloc[i]
+            
+            # Compare each field with tolerance for floating point
+            for col in required_columns:
+                if col in expected.columns:
+                    if col in ['debit', 'credit', 'balance']:
+                        # Numeric comparison with tolerance
+                        actual_val = float(actual_row[col]) if pd.notna(actual_row[col]) else 0
+                        expected_val = float(expected_row[col]) if pd.notna(expected_row[col]) else 0
+                        
+                        if abs(actual_val - expected_val) > 0.01:  # 1 cent tolerance
+                            results["errors"].append(
+                                f"Row {i} {col} mismatch: actual={actual_val}, expected={expected_val}"
+                            )
+                    elif col == 'date':
+                        if actual_row[col] != expected_row[col]:
+                            results["errors"].append(
+                                f"Row {i} date mismatch: actual={actual_row[col]}, expected={expected_row[col]}"
+                            )
+                    else:
+                        # String comparison (case insensitive for descriptions)
+                        actual_str = str(actual_row[col]).strip().upper()
+                        expected_str = str(expected_row[col]).strip().upper()
+                        
+                        if actual_str != expected_str:
+                            results["warnings"].append(
+                                f"Row {i} {col} mismatch: '{actual_row[col]}' vs '{expected_row[col]}'"
+                            )
+    
+    except Exception as e:
+        results["errors"].append(f"Comparison error: {str(e)}")
+    
+    # Determine if test passed
+    results["passed"] = len(results["errors"]) == 0
+    
+    return results
+
+
+def test_parser(parser_path: str, pdf_path: str, expected_csv: Optional[str] = None) -> bool:
+    """Test a parser against a PDF and optionally compare with expected CSV"""
+    
+    print(f"🧪 Testing parser: {parser_path}")
+    print(f"📄 PDF file: {pdf_path}")
+    
+    try:
+        # Load parser
+        parser = load_parser(parser_path)
+        
+        # Parse PDF
+        print("🔄 Running parser...")
+        result_df = parser.parse(pdf_path)
+        
+        print(f"✅ Parser executed successfully")
+        print(f"📊 Parsed {len(result_df)} transactions")
+        
+        # Display sample results
+        if not result_df.empty:
+            print("\n📋 Sample results:")
+            print(result_df.head())
+            print("\n📈 Summary statistics:")
+            numeric_cols = ['debit', 'credit', 'balance']
+            for col in numeric_cols:
+                if col in result_df.columns:
+                    total = result_df[col].sum()
+                    print(f"  {col.title()}: {total:.2f}")
+        
+        # Compare with expected if provided
+        if expected_csv:
+            print(f"\n🔍 Comparing with expected results: {expected_csv}")
+            expected_df = load_expected_csv(expected_csv)
+            comparison = compare_dataframes(result_df, expected_df)
+            
+            if comparison["passed"]:
+                print("✅ Validation PASSED!")
+            else:
+                print("❌ Validation FAILED!")
+                
+                for error in comparison["errors"]:
+                    print(f"  ❌ {error}")
+                
+                for warning in comparison["warnings"]:
+                    print(f"  ⚠️  {warning}")
+            
+            print(f"\n📊 Comparison stats:")
+            for key, value in comparison["stats"].items():
+                print(f"  {key}: {value}")
+            
+            return comparison["passed"]
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Test failed: {str(e)}")
+        return False
+
+
+def main():
+    """CLI entry point for testing parsers"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Test PDF Parser")
+    parser.add_argument("parser", help="Path to parser Python file")
+    parser.add_argument("pdf", help="Path to PDF file to parse")
+    parser.add_argument("--expected", help="Path to expected CSV file for validation")
+    parser.add_argument("--output", help="Save parsed results to CSV file")
+    
+    args = parser.parse_args()
+    
+    # Validate inputs
+    if not os.path.exists(args.parser):
+        print(f"❌ Parser file not found: {args.parser}")
+        sys.exit(1)
+    
+    if not os.path.exists(args.pdf):
+        print(f"❌ PDF file not found: {args.pdf}")
+        sys.exit(1)
+    
+    if args.expected and not os.path.exists(args.expected):
+        print(f"❌ Expected CSV file not found: {args.expected}")
+        sys.exit(1)
+    
+    # Run test
+    success = test_parser(args.parser, args.pdf, args.expected)
+    
+    # Save output if requested
+    if args.output:
+        try:
+            parser_module = load_parser(args.parser)
+            result_df = parser_module.parse(args.pdf)
+            result_df.to_csv(args.output, index=False)
+            print(f"💾 Results saved to: {args.output}")
+        except Exception as e:
+            print(f"❌ Failed to save output: {str(e)}")
+    
+    # Exit with appropriate code
+    sys.exit(0 if success else 1)
+
+
+if __name__ == "__main__":
+    main()
