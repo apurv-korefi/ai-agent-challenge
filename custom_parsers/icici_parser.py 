@@ -1,0 +1,266 @@
+"""
+ICICI Bank Statement Parser
+Parses ICICI bank statement PDFs and returns structured transaction data.
+"""
+
+import pandas as pd
+import re
+from datetime import datetime
+import pdfplumber
+from typing import List, Dict, Any
+
+
+def parse(pdf_path: str) -> pd.DataFrame:
+    """
+    Parse ICICI bank statement PDF and return DataFrame with standardized columns.
+    
+    Args:
+        pdf_path (str): Path to the ICICI bank statement PDF
+    
+    Returns:
+        pd.DataFrame: DataFrame with columns [date, description, debit, credit, balance]
+    """
+    
+    transactions = []
+    
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page_num, page in enumerate(pdf.pages):
+                text = page.extract_text()
+                if not text:
+                    continue
+                
+                # Extract transactions from this page
+                page_transactions = _extract_transactions_from_text(text)
+                transactions.extend(page_transactions)
+    
+    except Exception as e:
+        print(f"Error reading PDF: {str(e)}")
+        return pd.DataFrame()
+    
+    if not transactions:
+        print("No transactions found in the PDF")
+        return pd.DataFrame()
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(transactions)
+    
+    # Standardize and clean data
+    df = _clean_and_standardize(df)
+    
+    return df
+
+
+def _extract_transactions_from_text(text: str) -> List[Dict[str, Any]]:
+    """Extract transaction data from page text"""
+    
+    transactions = []
+    lines = text.split('\n')
+    
+    # ICICI statement patterns (adjust based on actual format)
+    # Common ICICI patterns:
+    # DD/MM/YY Description Amount(Dr/Cr) Balance
+    # or
+    # DD/MM/YYYY Description Debit Credit Balance
+    
+    date_pattern = r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})'
+    amount_pattern = r'[\d,]+\.?\d*'
+    
+    for line in lines:
+        line = line.strip()
+        
+        # Skip empty lines and headers
+        if not line or _is_header_line(line):
+            continue
+        
+        # Look for transaction lines with date pattern
+        date_match = re.search(date_pattern, line)
+        if not date_match:
+            continue
+        
+        try:
+            transaction = _parse_transaction_line(line, date_match)
+            if transaction:
+                transactions.append(transaction)
+        except Exception as e:
+            # Skip malformed lines
+            continue
+    
+    return transactions
+
+
+def _parse_transaction_line(line: str, date_match) -> Dict[str, Any]:
+    """Parse individual transaction line"""
+    
+    date_str = date_match.group(1)
+    
+    # Remove date from line to get remaining parts
+    remaining = line[date_match.end():].strip()
+    
+    # Split by multiple spaces or tabs to separate columns
+    parts = re.split(r'\s{2,}|\t+', remaining)
+    parts = [part.strip() for part in parts if part.strip()]
+    
+    if len(parts) < 2:
+        return None
+    
+    # Extract description (usually first part)
+    description = parts[0]
+    
+    # Extract amounts - typically last few parts are debit, credit, balance
+    amounts = []
+    for part in parts[1:]:
+        # Look for amount patterns
+        if re.match(r'^[\d,]+\.?\d*$', part.replace(',', '')):
+            amounts.append(_clean_amount(part))
+    
+    if len(amounts) < 1:
+        return None
+    
+    # Determine debit/credit based on ICICI format
+    # This may need adjustment based on actual format
+    debit = None
+    credit = None
+    balance = amounts[-1] if amounts else None
+    
+    if len(amounts) >= 3:
+        # Format: debit, credit, balance
+        debit = amounts[0] if amounts[0] > 0 else None
+        credit = amounts[1] if amounts[1] > 0 else None
+    elif len(amounts) == 2:
+        # Format: amount, balance - need to determine if debit or credit
+        amount = amounts[0]
+        # Heuristic: if description contains certain keywords, it's likely debit
+        if _is_likely_debit(description):
+            debit = amount
+        else:
+            credit = amount
+    
+    return {
+        'date': _parse_date(date_str),
+        'description': _clean_description(description),
+        'debit': debit,
+        'credit': credit,
+        'balance': balance
+    }
+
+
+def _is_header_line(line: str) -> bool:
+    """Check if line is a header or footer to skip"""
+    headers = [
+        'DATE', 'DESCRIPTION', 'DEBIT', 'CREDIT', 'BALANCE',
+        'STATEMENT', 'ACCOUNT', 'PERIOD', 'PAGE',
+        'ICICI BANK', 'CUSTOMER ID', 'BRANCH'
+    ]
+    
+    line_upper = line.upper()
+    return any(header in line_upper for header in headers)
+
+
+def _is_likely_debit(description: str) -> bool:
+    """Heuristic to determine if transaction is likely a debit"""
+    debit_keywords = [
+        'ATM', 'WITHDRAWAL', 'TRANSFER', 'PAYMENT', 'CHARGE', 'FEE',
+        'PURCHASE', 'DEBIT', 'CHEQUE', 'ECS', 'EMI'
+    ]
+    
+    desc_upper = description.upper()
+    return any(keyword in desc_upper for keyword in debit_keywords)
+
+
+def _clean_amount(amount_str: str) -> float:
+    """Clean and convert amount string to float"""
+    if not amount_str:
+        return None
+    
+    # Remove commas and currency symbols
+    cleaned = re.sub(r'[,₹$]', '', amount_str.strip())
+    
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _parse_date(date_str: str) -> datetime:
+    """Parse date string to datetime object"""
+    
+    # Try different date formats common in ICICI statements
+    formats = ['%d/%m/%Y', '%d/%m/%y', '%d-%m-%Y', '%d-%m-%y']
+    
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    
+    # If all formats fail, return None
+    return None
+
+
+def _clean_description(description: str) -> str:
+    """Clean transaction description"""
+    if not description:
+        return ""
+    
+    # Remove extra spaces and normalize
+    cleaned = ' '.join(description.split())
+    
+    # Remove common prefixes/suffixes that don't add value
+    patterns_to_remove = [
+        r'^(TO|FROM)\s+',
+        r'\s+(REF\s*NO|REFERENCE)\s*:?\s*\w*$',
+        r'\s*-\s*$'
+    ]
+    
+    for pattern in patterns_to_remove:
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+    
+    return cleaned.strip()
+
+
+def _clean_and_standardize(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean and standardize the DataFrame"""
+    
+    if df.empty:
+        return df
+    
+    # Ensure all required columns exist
+    required_columns = ['date', 'description', 'debit', 'credit', 'balance']
+    for col in required_columns:
+        if col not in df.columns:
+            df[col] = None
+    
+    # Sort by date
+    df = df.sort_values('date').reset_index(drop=True)
+    
+    # Fill NaN values appropriately
+    df['debit'] = df['debit'].fillna(0)
+    df['credit'] = df['credit'].fillna(0)
+    df['description'] = df['description'].fillna('')
+    
+    # Remove rows with invalid dates
+    df = df[df['date'].notna()].reset_index(drop=True)
+    
+    return df[required_columns]
+
+
+# Test function
+def test_parser():
+    """Test the parser with sample data"""
+    # This would be called during development/testing
+    sample_pdf = "data/icici/icici_sample.pdf"
+    
+    try:
+        result = parse(sample_pdf)
+        print(f"Parsed {len(result)} transactions")
+        print(result.head())
+        return result
+    except Exception as e:
+        print(f"Test failed: {str(e)}")
+        return None
+
+
+if __name__ == "__main__":
+    # Run test if executed directly
+    test_parser()
