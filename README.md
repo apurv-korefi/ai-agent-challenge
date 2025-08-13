@@ -41,6 +41,11 @@ ai-agent-challenge/
 - **`data/icici/`**: Contains the challenging PDF and expected results
 - **`tests/`**: Validates the generated parser against ground truth
 
+- ## Architecture Diagram
+
+- <img width="2300" height="2089" alt="Flowcharts" src="https://github.com/user-attachments/assets/8a0bf635-93ac-4703-966c-cad71640f130" />
+
+
 ## 🚀 5-Step Run Instructions
 
 ### Step 1: Get Gemini API Key
