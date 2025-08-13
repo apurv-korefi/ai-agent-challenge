@@ -1,0 +1,25 @@
+# Core dependencies for the Self-Fixing PDF Parser Agent
+# Core framework for building the agent workflow
+langgraph>=0.6.0
+
+# PDF processing libraries
+pypdf>=6.0.0
+pdfplumber>=0.10.0
+
+# Data manipulation and analysis
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Testing framework
+pytest>=8.0.0
+
+# Environment and configuration
+python-dotenv>=1.0.0
+
+# Type hints support
+typing-extensions>=4.0.0
+
+# AI/LLM integration for dynamic code generation
+google-generativeai>=0.8.0
+
+
