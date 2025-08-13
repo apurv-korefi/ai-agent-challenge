@@ -71,8 +71,8 @@ Test Failure → Error Analysis → Self-Fix → State Update → Loop Back
 ```
 Success OR Max Attempts → Final State → Output Generation → End
 
-
-## 🚀 5-Step Run Instructions
+```
+### 🚀 5-Step Run Instructions
 
 ### Step 1: Get Gemini API Key
 - Visit: https://makersuite.google.com/app/apikey
