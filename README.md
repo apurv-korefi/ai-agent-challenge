@@ -45,6 +45,32 @@ ai-agent-challenge/
 
 - <img width="2300" height="2089" alt="Flowcharts" src="https://github.com/user-attachments/assets/8a0bf635-93ac-4703-966c-cad71640f130" />
 
+## 🔄 Workflow Flow explaining Diagram
+
+### 1. **Initialization Phase**
+```
+User Command → Agent State → LangGraph Setup → First Node
+```
+
+### 2. **Code Generation Phase**
+```
+Gemini AI Prompt → Code Generation → File Writing → Next Node
+```
+
+### 3. **Testing Phase**
+```
+Generated Parser → Test Execution → Result Capture → Decision Point
+```
+
+### 4. **Learning Phase**
+```
+Test Failure → Error Analysis → Self-Fix → State Update → Loop Back
+```
+
+### 5. **Termination Phase**
+```
+Success OR Max Attempts → Final State → Output Generation → End
+
 
 ## 🚀 5-Step Run Instructions
 
