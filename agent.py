@@ -17,7 +17,7 @@ if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY not found in .env file. Please add it.")
 
 genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.5-pro')
 
 
 class AgentState(TypedDict):
@@ -52,10 +52,18 @@ def code_generation_node(state: AgentState):
         - Handle malformed PDF text with embedded spaces in numbers (e.g., "6 864.58" → "6864.58")
         - Handle multi-line descriptions and mashed transactions
         - The PDF is extremely malformed but you MUST extract the actual transaction data from it
-        - DO NOT just load result.csv - you must parse the PDF content itself
         - Focus on robust text extraction and pattern matching to reconstruct transactions
+        - The goal is to extract 100 transactions that match the expected CSV format
 
-        IMPORTANT: This is a real parsing challenge. Generate code that can extract the 100 transactions from the malformed PDF text.
+        PARSING STRATEGY:
+        - Extract text from all pages using pypdf
+        - Clean up text (remove non-breaking spaces, normalize whitespace)
+        - Find transaction blocks using date patterns (DD-MM-YYYY format)
+        - Extract amounts, descriptions, and balances from each block
+        - Use heuristics to determine debit vs credit based on description keywords
+        - Handle edge cases like missing values and malformed text
+
+        Generate clean, working Python code that can parse the ICICI PDF and return a DataFrame matching the expected CSV format.
         """
     else:
         # Subsequent attempts: Learn from previous failures
@@ -71,11 +79,17 @@ def code_generation_node(state: AgentState):
         - Output columns: ["Date", "Description", "Debit Amt", "Credit Amt", "Balance"]
         - Use pypdf for text extraction
         - The PDF is extremely malformed but you MUST extract the actual transaction data from it
-        - DO NOT just load result.csv - you must parse the PDF content itself
-        - Fix the specific issues identified in the error message
         - Focus on robust text extraction and pattern matching to reconstruct transactions
+        - Fix the specific issues identified in the error message
+        - The goal is to extract 100 transactions that match the expected CSV format
         
-        IMPORTANT: This is a real parsing challenge. Generate code that can extract the 100 transactions from the malformed PDF text.
+        LEARNING FROM FAILURE:
+        - Analyze what went wrong in the previous attempt
+        - Improve the parsing logic based on the error
+        - Handle edge cases that caused the failure
+        - Ensure robust error handling and data validation
+        
+        Generate improved Python code that addresses the previous failures and can successfully parse the malformed PDF.
         """
 
     try:
@@ -98,238 +112,46 @@ def code_generation_node(state: AgentState):
         
     except Exception as e:
         print(f"Gemini API error: {e}")
-        # Fallback to manual code if Gemini fails
-        if attempt == 0:
-            fallback_code = '''
+        # If Gemini fails, create a minimal working parser that can be improved
+        minimal_parser = '''
 import os
-import re
-import numpy as np
 import pandas as pd
 from pypdf import PdfReader
 
 def parse(pdf_path: str) -> pd.DataFrame:
+    """
+    Minimal parser - needs improvement through AI learning.
+    """
     try:
         reader = PdfReader(pdf_path)
         text = ""
         for page in reader.pages:
             text += (page.extract_text() or "") + "\\n"
         
-        # Compact spaces within numbers
-        text = re.sub(r"(?<![A-Za-z])([0-9][0-9\\s,\\.]+[0-9])(?![A-Za-z])", 
-                     lambda m: m.group(1).replace(" ", ""), text)
+        # Basic attempt at parsing - this will likely fail and need improvement
+        lines = text.splitlines()
+        data = []
         
-        # Split by dates and parse blocks
-        tokens = re.split(r"(?=\\b\\d{2}-\\d{2}-\\d{4}\\b)", text)
-        records = []
+        for line in lines:
+            # Very basic parsing - needs enhancement
+            parts = line.split()
+            if len(parts) >= 3:
+                try:
+                    # This is a placeholder - needs real parsing logic
+                    data.append([parts[0], " ".join(parts[1:-2]), parts[-2], parts[-1], parts[-1]])
+                except:
+                    continue
         
-        for token in tokens:
-            m = re.match(r"(\\d{2}-\\d{2}-\\d{4})\\b(.*)", token, flags=re.S)
-            if not m:
-                continue
-                
-            date, remainder = m.group(1), m.group(2)
-            nums = re.findall(r"-?\\d{1,3}(?:,\\d{3})*(?:\\.\\d+)?", remainder)
-            
-            if len(nums) < 2:
-                continue
-                
-            amount = float(nums[0].replace(",", ""))
-            balance = float(nums[-1].replace(",", ""))
-            first_pos = remainder.find(nums[0])
-            desc = remainder[:first_pos].strip(" ,:-\\n\\t")
-            
-            # Determine debit/credit
-            desc_lower = desc.lower()
-            credit_hint = any(kw in desc_lower for kw in 
-                            ["credit", "deposit", "from", "interest", "neft transfer from", 
-                             "cheque deposit", "cash deposit"])
-            
-            debit_val = np.nan
-            credit_val = np.nan
-            if credit_hint:
-                credit_val = amount
-            else:
-                debit_val = amount
-                
-            records.append({
-                "Date": date, "Description": desc, 
-                "Debit Amt": debit_val, "Credit Amt": credit_val, 
-                "Balance": balance
-            })
-        
-        df = pd.DataFrame(records, columns=["Date", "Description", "Debit Amt", "Credit Amt", "Balance"])
-        
-        if not df.empty:
-            df['Debit Amt'] = pd.to_numeric(df['Debit Amt'], errors='coerce')
-            df['Credit Amt'] = pd.to_numeric(df['Credit Amt'], errors='coerce')
-            df['Balance'] = pd.to_numeric(df['Balance'], errors='coerce')
-        
-        # Fallback to CSV if empty
-        if df.empty:
-            data_dir = os.path.dirname(os.path.abspath(pdf_path))
-            csv_path = os.path.join(data_dir, 'result.csv')
-            if os.path.exists(csv_path):
-                return pd.read_csv(csv_path)
-        
+        df = pd.DataFrame(data, columns=["Date", "Description", "Debit Amt", "Credit Amt", "Balance"])
         return df
         
-    except Exception:
-        # Ultimate fallback
-        data_dir = os.path.dirname(os.path.abspath(pdf_path))
-        csv_path = os.path.join(data_dir, 'result.csv')
-        if os.path.exists(csv_path):
-            return pd.read_csv(csv_path)
-        return pd.DataFrame(columns=["Date", "Description", "Debit Amt", "Credit Amt", "Balance"])
-'''
-        elif attempt == 1:
-            # Second attempt: More robust PDF parsing
-            fallback_code = '''
-import os
-import re
-import pandas as pd
-import numpy as np
-from pypdf import PdfReader
-
-def parse(pdf_path: str) -> pd.DataFrame:
-    """
-    Advanced PDF parser for malformed ICICI statements.
-    Focuses on robust text extraction and pattern matching.
-    """
-    try:
-        reader = PdfReader(pdf_path)
-        text = ""
-        for page in reader.pages:
-            text += (page.extract_text() or "") + "\\n"
-        
-        # Clean up the text
-        text = re.sub(r"\\xa0", " ", text)  # Replace non-breaking spaces
-        text = re.sub(r"(?<![A-Za-z])([0-9][0-9\\s,\\.]+[0-9])(?![A-Za-z])", 
-                     lambda m: m.group(1).replace(" ", ""), text)
-        
-        # Find transaction blocks by looking for date patterns
-        date_pattern = r"\\b\\d{2}-\\d{2}-\\d{4}\\b"
-        transactions = []
-        
-        # Split text into potential transaction blocks
-        blocks = re.split(f"({date_pattern})", text)
-        
-        for i in range(1, len(blocks), 2):  # Skip even indices (they're the split patterns)
-            if i + 1 < len(blocks):
-                date = blocks[i]
-                content = blocks[i + 1] if i + 1 < len(blocks) else ""
-                
-                # Extract numbers from the content
-                numbers = re.findall(r"-?\\d{1,3}(?:,\\d{3})*(?:\\.\\d+)?", content)
-                
-                if len(numbers) >= 2:
-                    # First number is usually the transaction amount, last is balance
-                    amount = float(numbers[0].replace(",", ""))
-                    balance = float(numbers[-1].replace(",", ""))
-                    
-                    # Extract description (text between date and first number)
-                    first_num_pos = content.find(numbers[0])
-                    description = content[:first_num_pos].strip(" ,:-\\n\\t")
-                    
-                    # Determine if it's debit or credit based on description
-                    desc_lower = description.lower()
-                    credit_keywords = ["credit", "deposit", "from", "interest", "neft transfer from", 
-                                     "cheque deposit", "cash deposit", "salary"]
-                    
-                    debit_val = np.nan
-                    credit_val = np.nan
-                    
-                    if any(keyword in desc_lower for keyword in credit_keywords):
-                        credit_val = amount
-                    else:
-                        debit_val = amount
-                    
-                    transactions.append({
-                        "Date": date,
-                        "Description": description,
-                        "Debit Amt": debit_val,
-                        "Credit Amt": credit_val,
-                        "Balance": balance
-                    })
-        
-        df = pd.DataFrame(transactions, columns=["Date", "Description", "Debit Amt", "Credit Amt", "Balance"])
-        
-        if not df.empty:
-            # Clean up numeric columns
-            df['Debit Amt'] = pd.to_numeric(df['Debit Amt'], errors='coerce')
-            df['Credit Amt'] = pd.to_numeric(df['Credit Amt'], errors='coerce')
-            df['Balance'] = pd.to_numeric(df['Balance'], errors='coerce')
-            
-            # Remove rows with invalid data
-            df = df.dropna(subset=['Date', 'Balance'])
-            
-            print(f"Successfully parsed {len(df)} transactions from PDF")
-            return df
-        else:
-            raise ValueError("No transactions could be extracted from PDF")
-            
     except Exception as e:
-        print(f"PDF parsing failed: {e}")
-        # Only as last resort, return empty DataFrame with correct structure
-        return pd.DataFrame(columns=["Date", "Description", "Debit Amt", "Credit Amt", "Balance"])
-'''
-        else:
-            # Final attempt (attempt >= 2): Guaranteed success through CSV loading
-            fallback_code = '''
-import os
-import pandas as pd
-
-def parse(pdf_path: str) -> pd.DataFrame:
-    """
-    Final fallback parser that directly loads the result.csv file.
-    This ensures the DataFrame.equals test passes within the 3-attempt limit.
-    """
-    # Get the directory containing the PDF
-    data_dir = os.path.dirname(os.path.abspath(pdf_path))
-    # Look for result.csv in the same directory
-    csv_path = os.path.join(data_dir, 'result.csv')
-    
-    if os.path.exists(csv_path):
-        print(f"Loading result.csv: {csv_path}")
-        df = pd.read_csv(csv_path)
-        print(f"Loaded {len(df)} rows from CSV")
-        return df
-    else:
-        print(f"ERROR: result.csv not found at {csv_path}")
-        # Return empty DataFrame with correct columns as last resort
+        print(f"Parsing failed: {e}")
         return pd.DataFrame(columns=["Date", "Description", "Debit Amt", "Credit Amt", "Balance"])
 '''
         
-        state['code'] = fallback_code
-        print(f"Using fallback code for attempt {attempt + 1}")
-
-    # On the final attempt, always use the guaranteed working fallback
-    if attempt >= 2:
-        print("Final attempt - using guaranteed working fallback code")
-        final_fallback = '''
-import os
-import pandas as pd
-
-def parse(pdf_path: str) -> pd.DataFrame:
-    """
-    Final fallback parser that directly loads the result.csv file.
-    This ensures the DataFrame.equals test passes within the 3-attempt limit.
-    """
-    # Get the directory containing the PDF
-    data_dir = os.path.dirname(os.path.abspath(pdf_path))
-    # Look for result.csv in the same directory
-    csv_path = os.path.join(data_dir, 'result.csv')
-    
-    if os.path.exists(csv_path):
-        print(f"Loading result.csv: {csv_path}")
-        df = pd.read_csv(csv_path)
-        print(f"Loaded {len(df)} rows from CSV")
-        return df
-    else:
-        print(f"ERROR: result.csv not found at {csv_path}")
-        # Return empty DataFrame with correct columns as last resort
-        return pd.DataFrame(columns=["Date", "Description", "Debit Amt", "Credit Amt", "Balance"])
-'''
-        state['code'] = final_fallback
+        state['code'] = minimal_parser
+        print(f"Using minimal parser due to Gemini API error for attempt {attempt + 1}")
 
     # Write parser for both import paths used by tests
     for pkg in ["custom_parsers", "custom_parser"]:
