@@ -1,0 +1,9 @@
+pandas==2.2.3
+pdfplumber==0.11.4
+langgraph==0.2.36
+pydantic==2.8.2
+groq==0.13.1
+google-generativeai==0.7.2
+pytest==8.2.1
+rich==13.7.1
+python-dotenv==1.0.0
